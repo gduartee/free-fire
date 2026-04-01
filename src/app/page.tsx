@@ -1270,14 +1270,27 @@ export default function Home() {
               💎 5.600 + 1.200
             </p>
             <p className="text-xs text-[#666]">
-              Total: <strong className="text-[#1a1a1a]">R$ 18,44</strong>
+              Total:{" "}
+              <strong className="text-[#1a1a1a]">
+                R${" "}
+                {(
+                  (1844 +
+                    selectedOffers.reduce(
+                      (sum, i) => sum + offers[i].price,
+                      0
+                    )) /
+                  100
+                )
+                  .toFixed(2)
+                  .replace(".", ",")}
+              </strong>
             </p>
           </div>
           <button
             onClick={() => setPage("pagamento")}
             className="bg-[#dc3545] text-white font-bold px-6 py-3 rounded-lg text-[14px] flex items-center gap-2 hover:bg-[#c82333] transition"
           >
-            <Loader2 className="w-4 h-4 animate-spin" /> Compre agora
+            Compre agora
           </button>
         </div>
 
