@@ -96,6 +96,10 @@ export default function Home() {
     return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
   }
 
+  // Valor total dinâmico (base + offers selecionados) em centavos
+  const totalCents = 1844 + selectedOffers.reduce((sum, i) => sum + offers[i].price, 0);
+  const totalFormatted = (totalCents / 100).toFixed(2).replace(".", ",");
+
   // Timer countdown
   useEffect(() => {
     if (!timerActive) return;
@@ -146,7 +150,7 @@ export default function Home() {
     setPixLoading(true);
     setPixError("");
     try {
-      const amountCents = 1844; // R$ 18,44
+      const amountCents = totalCents;
       const res = await fetch("/api/create-pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -173,7 +177,7 @@ export default function Home() {
     } finally {
       setPixLoading(false);
     }
-  }, [playerId, email, cpf, phone]);
+  }, [playerId, email, cpf, phone, totalCents]);
 
   const handlePaymentSubmit = () => {
     const errors: Record<string, string> = {};
@@ -1253,7 +1257,7 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <img src="/images/pay-pix.png" alt="Pix" className="h-8" />
               <div>
-                <p className="font-bold text-[#1a1a1a]">R$ 18,44</p>
+                <p className="font-bold text-[#1a1a1a]">R$ {totalFormatted}</p>
                 <p className="text-xs text-[#28a745] font-semibold">
                   + Bônus 1.200 💎
                 </p>
@@ -1273,17 +1277,7 @@ export default function Home() {
             <p className="text-xs text-[#666]">
               Total:{" "}
               <strong className="text-[#1a1a1a]">
-                R${" "}
-                {(
-                  (1844 +
-                    selectedOffers.reduce(
-                      (sum, i) => sum + offers[i].price,
-                      0
-                    )) /
-                  100
-                )
-                  .toFixed(2)
-                  .replace(".", ",")}
+                R$ {totalFormatted}
               </strong>
             </p>
           </div>
@@ -1371,7 +1365,7 @@ export default function Home() {
           </p>
           <div className="flex justify-between mt-4">
             <span className="text-[#1a1a1a] font-medium">Preço</span>
-            <span className="font-bold text-[#1a1a1a]">R$ 18,44</span>
+            <span className="font-bold text-[#1a1a1a]">R$ {totalFormatted}</span>
           </div>
           <div className="flex justify-between mt-2">
             <span className="text-[#1a1a1a] font-medium">
@@ -1536,7 +1530,7 @@ export default function Home() {
 
           <div className="flex justify-between items-center bg-[#f0fdf4] rounded-lg p-3 mb-6">
             <span className="text-sm text-[#166534] font-medium">Valor:</span>
-            <span className="text-lg font-bold text-[#166534]">R$ 18,44</span>
+            <span className="text-lg font-bold text-[#166534]">R$ {totalFormatted}</span>
           </div>
 
           <div className="border-t pt-4">
@@ -1592,7 +1586,7 @@ export default function Home() {
               <strong>ID do jogador:</strong> {playerId}
             </p>
             <p className="text-sm text-[#166534] mt-1">
-              <strong>Valor pago:</strong> R$ 18,44
+              <strong>Valor pago:</strong> R$ {totalFormatted}
             </p>
           </div>
           <button
