@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
         amount,
         description,
         reference,
-        productHash: process.env.product_hash!,
+        productHash: 'prod_99665f9da04f789e',
         customer: {
           name: customer.name,
           email: customer.email,
