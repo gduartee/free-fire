@@ -11,6 +11,7 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { questions, testimonials, offers, midpoints } from "@/data/questions";
 import type { QuizOption } from "@/data/questions";
 
@@ -1494,7 +1495,11 @@ export default function Home() {
           </div>
 
           <div className="flex justify-center mb-6">
-            {pixData.qr_code_base64 ? (
+            {pixData.qr_code ? (
+              <div className="bg-white p-3 rounded-lg border">
+                <QRCodeSVG value={pixData.qr_code} size={220} />
+              </div>
+            ) : pixData.qr_code_base64 ? (
               <img
                 src={`data:image/png;base64,${pixData.qr_code_base64}`}
                 alt="QR Code PIX"
