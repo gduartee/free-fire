@@ -370,11 +370,6 @@ export default function Home() {
   if (page === "security") {
     return (
       <div className="flex flex-col items-center justify-center px-5 py-12 max-w-md mx-auto gap-8 min-h-[60vh]">
-        <img
-          src="/images/freefire-logo-large.png"
-          alt="Free Fire"
-          className="w-64 h-auto select-none"
-        />
         <h2 className="text-lg font-extrabold text-[#ee2b2b] italic text-center">
           Verificação de Segurança
         </h2>
